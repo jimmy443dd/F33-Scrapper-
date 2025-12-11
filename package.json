@@ -1,0 +1,13 @@
+{
+  "name": "email-scraper",
+  "version": "1.0.0",
+  "description": "A serverless email scraper for extracting emails from webpages.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "puppeteer-core": "^21.3.8",
+    "chrome-aws-lambda": "^10.2.0"
+  }
+}
