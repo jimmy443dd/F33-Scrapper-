@@ -1,26 +1,28 @@
+const express = require('express');
 const puppeteer = require('puppeteer');
 const { validateAndExtractEmails, exportToCSV } = require('./helpers');
+const path = require('path');
 
-module.exports = async (req, res) => {
-  const { url } = req.query;
+const app = express();
+const PORT = process.env.PORT || 3000; // Render runs on a specified PORT environment
+
+app.get('/', async (req, res) => {
+  const url = req.query.url;
 
   if (!url || !url.startsWith('http')) {
+    // Return HTTP 400 if URL is invalid
     return res.status(400).send({
-      error: 'Please provide a valid URL. Ensure it starts with http or https.',
+      error: 'Invalid URL. Please provide a valid URL that starts with http or https.',
     });
   }
 
-  console.log(`Scraping emails from: ${url}...`);
+  console.log(`Processing URL: ${url}`);
 
   try {
-    // Launch Puppeteer
-    const browser = await puppeteer.launch({
-      headless: true, // Run browser in headless mode
-    });
-
+    const browser = await puppeteer.launch({ headless: true }); // Full Puppeteer instance
     const page = await browser.newPage();
 
-    // Skip unnecessary requests (e.g., images, styles)
+    // Skip unnecessary requests like images or CSS files
     await page.setRequestInterception(true);
     page.on('request', (req) => {
       if (['image', 'stylesheet', 'font', 'media'].includes(req.resourceType())) {
@@ -30,34 +32,38 @@ module.exports = async (req, res) => {
       }
     });
 
-    // Navigate to the URL
     await page.goto(url, { waitUntil: 'domcontentloaded' });
 
-    // Extract text content and emails
+    // Extract emails from page content
     const pageContent = await page.content();
     const emails = validateAndExtractEmails(pageContent);
 
     await browser.close();
 
     if (emails.length > 0) {
-      // Export emails to a downloadable CSV
-      const filePath = `/tmp/emails.csv`; // Temporary path for serverless environments
+      // Save emails to a CSV file
+      const filePath = path.join(__dirname, 'emails.csv');
       exportToCSV(emails, filePath);
 
-      console.log(`Found ${emails.length} emails:`, emails);
+      console.log(`Emails extracted:`, emails);
 
-      // Send downloadable CSV as a response
+      // Send CSV file for download
       res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', 'attachment; filename=emails.csv');
-      return res.status(200).sendFile(filePath);
+      res.setHeader('Content-Disposition', `attachment; filename="emails.csv"`);
+      return res.download(filePath);
     } else {
-      console.log('No emails found!');
-      return res.status(200).json({ message: 'No emails found on the page.' });
+      console.log('No emails found.');
+      return res.status(200).send({ message: 'No emails were found on the given page.' });
     }
   } catch (error) {
-    console.error('Error during scraping:', error.message);
+    console.error('Error scraping the page:', error);
     return res.status(500).send({
-      error: 'An error occurred during scraping. Please try again.',
+      error: 'An error occurred while processing your request.',
     });
   }
-};
+});
+
+// Start the server
+app.listen(PORT, () => {
+  console.log(`Email scraper running on port ${PORT}`);
+});
