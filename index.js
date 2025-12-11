@@ -1,5 +1,4 @@
-const puppeteer = require('puppeteer-core');
-const chromium = require('chrome-aws-lambda');
+const puppeteer = require('puppeteer');
 const { validateAndExtractEmails, exportToCSV } = require('./helpers');
 
 module.exports = async (req, res) => {
@@ -14,12 +13,9 @@ module.exports = async (req, res) => {
   console.log(`Scraping emails from: ${url}...`);
 
   try {
-    // Launch Puppeteer with Lambda-compatible Chromium
+    // Launch Puppeteer
     const browser = await puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath, // Lambda-compatible Chromium
-      headless: true,
+      headless: true, // Run browser in headless mode
     });
 
     const page = await browser.newPage();
